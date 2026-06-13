@@ -14,19 +14,36 @@ DATA_DIR = "MY_data"
 ZIP_FILE = "MY_data.zip"
 FILE_ID = "1GFmUWOjoSyEclPPnp3a2vl-4HvLl0SC9"
 
-# --- AUTO DOWNLOAD & UNZIP SETUP (FIXED WITH REQUESTS) ---
+# --- GOOGLE DRIVE LARGE FILE DOWNLOAD FUNCTION ---
+def download_file_from_google_drive(id, destination):
+    URL = "https://docs.google.com/uc?export=download"
+    session = requests.Session()
+    
+    # 1. Mulින්ම confirm token එකක් ලැබෙනවද බලනවා (Large file confirmation bypass)
+    response = session.get(URL, params={'id': id, 'export': 'download'}, stream=True)
+    token = None
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            token = value
+            break
+
+    # 2. Token එකක් තිබුනොත් ඒකත් එක්ක request එක යවනවා
+    if token:
+        params = {'id': id, 'confirm': token, 'export': 'download'}
+        response = session.get(URL, params=params, stream=True)
+        
+    # 3. Chunk බයි chunk file එක write කරනවා
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(32768):
+            if chunk:
+                f.write(chunk)
+
+# --- AUTO DOWNLOAD & UNZIP SETUP ---
 if not os.path.exists(DATA_DIR):
     with st.spinner("📂 Dataset eka Google Drive eken download wenawa... Winadiyak wath yayi..."):
         try:
-            # Google Drive Direct Download URL
-            url = f"https://docs.google.com/uc?export=download&id={FILE_ID}&confirm=t"
-            
-            # Python requests වලින් file එක download කිරීම
-            response = requests.get(url, stream=True)
-            with open(ZIP_FILE, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+            # Bypass function එක run කිරීම
+            download_file_from_google_drive(FILE_ID, ZIP_FILE)
             
             # Zip file eka extract කරනවා
             with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:

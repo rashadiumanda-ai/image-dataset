@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import random
 import zipfile
-import requests
+import subprocess
 from PIL import Image
 
 st.set_page_config(page_title="Image Dataset Viewer", layout="wide", page_icon="🖼️")
@@ -14,46 +14,28 @@ DATA_DIR = "MY_data"
 ZIP_FILE = "MY_data.zip"
 FILE_ID = "1GFmUWOjoSyEclPPnp3a2vl-4HvLl0SC9"
 
-# --- GOOGLE DRIVE LARGE FILE DOWNLOAD FUNCTION ---
-def download_file_from_google_drive(id, destination):
-    URL = "https://docs.google.com/uc?export=download"
-    session = requests.Session()
-    
-    # 1. Mulින්ම confirm token එකක් ලැබෙනවද බලනවා (Large file confirmation bypass)
-    response = session.get(URL, params={'id': id, 'export': 'download'}, stream=True)
-    token = None
-    for key, value in response.cookies.items():
-        if key.startswith('download_warning'):
-            token = value
-            break
-
-    # 2. Token එකක් තිබුනොත් ඒකත් එක්ක request එක යවනවා
-    if token:
-        params = {'id': id, 'confirm': token, 'export': 'download'}
-        response = session.get(URL, params=params, stream=True)
-        
-    # 3. Chunk බයි chunk file එක write කරනවා
-    with open(destination, "wb") as f:
-        for chunk in response.iter_content(32768):
-            if chunk:
-                f.write(chunk)
-
-# --- AUTO DOWNLOAD & UNZIP SETUP ---
+# --- AUTO DOWNLOAD & UNZIP SETUP (STABLE GDOWN WRAPPER) ---
 if not os.path.exists(DATA_DIR):
-    with st.spinner("📂 Dataset eka Google Drive eken download wenawa... Winadiyak wath yayi..."):
+    with st.spinner("📂 Dataset eka download wenawa... Winadiyak wath yayi..."):
         try:
-            # Bypass function එක run කිරීම
-            download_file_from_google_drive(FILE_ID, ZIP_FILE)
+            # Linux python module ekak widihata gdown run කරනවා command line nathuwa
+            # Drive confirmation skip කරන්න direct connection url එකක් හදනවා
+            download_url = f"https://drive.google.com/uc?id={FILE_ID}"
+            
+            # Subprocess python binary ekama use karla run කරනවා shell mapping prashna nathi wenna
+            import sys
+            subprocess.check_call([sys.executable, "-m", "gdown", download_url, "-O", ZIP_FILE])
             
             # Zip file eka extract කරනවා
-            with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:
-                zip_ref.extractall(".")
+            if os.path.exists(ZIP_FILE) and os.path.getsize(ZIP_FILE) > 10000:
+                with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:
+                    zip_ref.extractall(".")
+                st.success("✅ Dataset download and unzip completed successfully!")
                 
-            st.success("✅ Dataset download and unzip completed successfully!")
-            
-            # Storage ඉතුරු කරගන්න zip file එක delete කරනවා
-            if os.path.exists(ZIP_FILE):
+                # Delete zip for space saving
                 os.remove(ZIP_FILE)
+            else:
+                st.error("❌ Downloaded file is too small or corrupted.")
                 
         except Exception as e:
             st.error(f"❌ Error downloading dataset: {e}")

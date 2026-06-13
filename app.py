@@ -1,16 +1,41 @@
 import streamlit as st
 import os
 import random
+import zipfile
+import subprocess
 from PIL import Image
 
 st.set_page_config(page_title="Image Dataset Viewer", layout="wide", page_icon="🖼️")
 
 st.title("🖼️ Image Dataset Explorer Dashboard")
-st.write("Google Drive එකෙන් ගත්තු Image Dataset එක Streamlit මඟින් visualizes කිරීම.")
+st.write("Google Drive එකෙන් ගත්තු Image Dataset එක Streamlit mgin visualizes කිරීම.")
 
 DATA_DIR = "MY_data"
+ZIP_FILE = "MY_data.zip"
+FILE_ID = "1GFmUWOjoSyEclPPnp3a2vl-4HvLl0SC9"
 
-# Folders තියෙනවද බලනවා
+# --- AUTO DOWNLOAD & UNZIP SETUP ---
+# Streamlit cloud server eka athule folder eka nathnam auto download wenna hadනවා
+if not os.path.exists(DATA_DIR):
+    with st.spinner("📂 Dataset eka Google Drive eken download wenawa... Winadiyak wath yayi..."):
+        try:
+            # gdown command eka cloud terminal eke run කරනවා
+            subprocess.run(["gdown", f"https://drive.google.com/uc?id={FILE_ID}", "-O", ZIP_FILE], check=True)
+            
+            # Zip file eka extract කරනවා
+            with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:
+                zip_ref.extractall(".")
+                
+            st.success("✅ Dataset download and unzip completed successfully!")
+            
+            # Use කරපු zip file eka delete කරනවා storage ithuru කරන්න
+            if os.path.exists(ZIP_FILE):
+                os.remove(ZIP_FILE)
+                
+        except Exception as e:
+            st.error(f"❌ Error downloading dataset: {e}")
+
+# --- MAIN APP LOGIC ---
 if os.path.exists(DATA_DIR):
     tabs = st.tabs(["📊 Dataset Summary", "🔍 Browse Images"])
     
@@ -22,18 +47,17 @@ if os.path.exists(DATA_DIR):
         for folder in ["train", "test", "predict"]:
             path = os.path.join(DATA_DIR, folder)
             if os.path.exists(path):
-                # ඇතුළේ තියෙන subdivisions (classes) හෝ image files ගණන් කරනවා
                 total_files = sum([len(files) for r, d, files in os.walk(path)])
                 folder_stats[folder] = total_files
         
-        # Stats ටික ලස්සනට පෙන්නන්න Columns
-        cols = st.columns(len(folder_stats))
-        for i, (folder_name, count) in enumerate(folder_stats.items()):
-            with cols[i]:
-                st.metric(label=f"Total Images in '{folder_name}'", value=count)
-                
-        # Simple Bar Chart එකක්
-        st.bar_chart(folder_stats)
+        if folder_stats:
+            cols = st.columns(len(folder_stats))
+            for i, (folder_name, count) in enumerate(folder_stats.items()):
+                with cols[i]:
+                    st.metric(label=f"Total Images in '{folder_name}'", value=count)
+            st.bar_chart(folder_stats)
+        else:
+            st.warning("No splits (train/test/predict) found inside MY_data.")
 
     # --- TAB 2: IMAGE BROWSER ---
     with tabs[1]:
@@ -42,7 +66,6 @@ if os.path.exists(DATA_DIR):
         
         target_path = os.path.join(DATA_DIR, selected_folder)
         
-        # සියලුම image paths ටික ලිස්ට් එකකට ගන්නවා
         all_images = []
         for root, dirs, files in os.walk(target_path):
             for file in files:
@@ -51,18 +74,14 @@ if os.path.exists(DATA_DIR):
                     
         if all_images:
             st.write(f"📸 Found {len(all_images)} images. Showing 6 random samples:")
-            
-            # Random images 6ක් තෝරගන්නවා
             sample_images = random.sample(all_images, min(6, len(all_images)))
             
-            # Grid එකක් විදිහට images 3 ගානේ පේළි දෙකකට පෙන්නනවා
             img_cols = st.columns(3)
             for idx, img_path in enumerate(sample_images):
                 col_idx = idx % 3
                 with img_cols[col_idx]:
                     try:
                         img = Image.open(img_path)
-                        # Folder name එක caption එක විදිහට දානවා
                         caption_name = os.path.basename(os.path.dirname(img_path)) + " / " + os.path.basename(img_path)
                         st.image(img, caption=caption_name, use_column_width=True)
                     except Exception as e:
@@ -70,4 +89,4 @@ if os.path.exists(DATA_DIR):
         else:
             st.warning(f"No valid images found in '{selected_folder}' folder.")
 else:
-    st.error("Error: 'MY_data' folder එක සොයාගත නොහැකි විය. කරුණාකර පළමු පියවර නැවත බලන්න.")
+    st.error("Error: 'MY_data' folder eka hoyaganna bari una.")

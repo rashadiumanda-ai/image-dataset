@@ -2,25 +2,31 @@ import streamlit as st
 import os
 import random
 import zipfile
-import subprocess
+import requests
 from PIL import Image
 
 st.set_page_config(page_title="Image Dataset Viewer", layout="wide", page_icon="🖼️")
 
 st.title("🖼️ Image Dataset Explorer Dashboard")
-st.write("Google Drive එකෙන් ගත්තු Image Dataset එක Streamlit mgin visualizes කිරීම.")
+st.write("Google Drive එකෙන් ගත්තු Image Dataset එක Streamlit මඟින් visualizes කිරීම.")
 
 DATA_DIR = "MY_data"
 ZIP_FILE = "MY_data.zip"
 FILE_ID = "1GFmUWOjoSyEclPPnp3a2vl-4HvLl0SC9"
 
-# --- AUTO DOWNLOAD & UNZIP SETUP ---
-# Streamlit cloud server eka athule folder eka nathnam auto download wenna hadනවා
+# --- AUTO DOWNLOAD & UNZIP SETUP (FIXED WITH REQUESTS) ---
 if not os.path.exists(DATA_DIR):
     with st.spinner("📂 Dataset eka Google Drive eken download wenawa... Winadiyak wath yayi..."):
         try:
-            # gdown command eka cloud terminal eke run කරනවා
-            subprocess.run(["gdown", f"https://drive.google.com/uc?id={FILE_ID}", "-O", ZIP_FILE], check=True)
+            # Google Drive Direct Download URL
+            url = f"https://docs.google.com/uc?export=download&id={FILE_ID}&confirm=t"
+            
+            # Python requests වලින් file එක download කිරීම
+            response = requests.get(url, stream=True)
+            with open(ZIP_FILE, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
             
             # Zip file eka extract කරනවා
             with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:
@@ -28,7 +34,7 @@ if not os.path.exists(DATA_DIR):
                 
             st.success("✅ Dataset download and unzip completed successfully!")
             
-            # Use කරපු zip file eka delete කරනවා storage ithuru කරන්න
+            # Storage ඉතුරු කරගන්න zip file එක delete කරනවා
             if os.path.exists(ZIP_FILE):
                 os.remove(ZIP_FILE)
                 
